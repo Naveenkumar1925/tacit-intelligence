@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+backups/*.dump
+corpus/audio/*.wav
+corpus/audio/*.m4a
+corpus/audio/*.mp3
