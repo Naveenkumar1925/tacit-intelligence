@@ -96,7 +96,8 @@ RETURN dense, sparse, sim_clauses, exact_clauses,
        clause: head([(x)-[:CITES]->(c:Clause) | c.clause_id])}],
     kpis: [(q:QualityKPI)-[:FOR]->(e) |
       {process_id: q.process_id, metric: q.metric, period: q.period,
-       value: q.value}],
+       value: q.value,
+       descr: head([(q)-[:OF]->(p:Process) | p.description])}],
     procedures: [(p:Procedure)-[:APPLIES_TO]->(e) | p.sop_id],
     siblings: [(:Area)-[:CONTAINS]->(s:Equipment)
                WHERE s.iso14224_class = e.iso14224_class AND s.tag <> e.tag |
@@ -154,11 +155,17 @@ QUALITY_RE = re.compile(
 
 
 def process_anchor_tags(question, register):
-    """PRC ids or process descriptions ('feed flow control') anchor equipment."""
+    """PRC ids or process descriptions ('feed flow control') anchor equipment.
+
+    Matches the id, the full description, or its two-word prefix — 'the feed
+    transfer process' must reach 'Feed transfer to Process Area'."""
     q = question.lower()
     tags, pids = [], []
     for p in register.get("processes", []):
-        if p["pid"].lower() in q or (p["descr"] and p["descr"].lower() in q):
+        descr = (p["descr"] or "").lower()
+        prefix = " ".join(descr.split()[:2])
+        if (p["pid"].lower() in q or (descr and descr in q)
+                or (len(prefix.split()) == 2 and prefix in q)):
             tags.append(p["tag"])
             pids.append(p["pid"])
     return tags, pids
@@ -264,6 +271,8 @@ def build_evidence(fused, graph, blend, modes=(), clauses=(), quality=False):
 
     def add_chunks():
         n_text = MAX_TEXT_EVIDENCE if blend["text"] >= 0.5 else 3
+        if quality:
+            n_text = 2          # analytics questions: computed evidence leads
         for f in fused[:n_text]:
             c = f["item"]
             add("chunk", f"{c['doc']} page {c['page']}", c["text"][:MAX_CHUNK_CHARS],
@@ -297,41 +306,6 @@ def build_evidence(fused, graph, blend, modes=(), clauses=(), quality=False):
                         for w in corr)
                     add("history", label, lines, tag=eq["tag"], hop=hop,
                         wo_ids=[w["wo_id"] for w in corr])
-                if quality and eq.get("kpis"):
-                    by_pm = {}
-                    for k in eq["kpis"]:
-                        by_pm.setdefault((k["process_id"], k["metric"]),
-                                         []).append(k)
-                    kpi_lines = []
-                    for (pid, metric), vals in sorted(by_pm.items()):
-                        vals.sort(key=lambda k: k["period"])
-                        series = " | ".join(f"{v['period']}={v['value']}"
-                                            for v in vals[-4:])
-                        flag = ""
-                        d = STANDARDS_PACK["kpi_defs"].get(metric, {})
-                        if metric == "CPK" and vals[-1]["value"] < d.get("min", 0):
-                            flag = (f"   -> BELOW {d['min']} MINIMUM: NOT CAPABLE "
-                                    "(clause 9.1)")
-                        if (metric == "PPM" and len(vals) >= 3 and
-                                vals[-1]["value"] > vals[-2]["value"]
-                                > vals[-3]["value"]):
-                            flag = ("   -> RISING 3 CONSECUTIVE MONTHS: "
-                                    "INVESTIGATE (clause 9.1)")
-                        kpi_lines.append(f"  {pid} {metric}: {series}{flag}")
-                    add("kpi", f"{eq['tag']} computed quality KPIs "
-                        "(structured store — computed, never embedded)",
-                        "\n".join(kpi_lines), tag=eq["tag"], hop=0,
-                        query="MATCH (q:QualityKPI {tag: $tag}) RETURN q.process_id,"
-                              " q.metric, q.period, q.value ORDER BY q.period")
-                if quality and eq.get("ncrs"):
-                    ncr_lines = "\n".join(
-                        f"  {n['ncr_id']}  {n['date']}  [{n['status']}] clause "
-                        f"{n['clause']}: {n['description'][:110]}"
-                        for n in sorted(eq["ncrs"], key=lambda n: n["date"],
-                                        reverse=True)[:4])
-                    add("ncr", f"{eq['tag']} nonconformance register "
-                        "(clause-linked)", ncr_lines, tag=eq["tag"], hop=1,
-                        ncr_ids=[n["ncr_id"] for n in eq["ncrs"][:4]])
                 if eq.get("inspections"):
                     today = time.strftime("%Y-%m-%d")
                     insp_lines = "\n".join(
@@ -362,8 +336,56 @@ def build_evidence(fused, graph, blend, modes=(), clauses=(), quality=False):
                 clause_id=cl["clause_id"], page=cl["page"],
                 doc=STANDARDS_PACK["std_id"], score=round(cl["score"], 3))
 
-    # clauses are the most precise evidence when present; then spec 8 ordering:
-    # graph facts lead for equipment-anchored questions, text leads otherwise
+    def add_quality():
+        # computed KPIs + clause-linked NCRs for anchored equipment. Emitted
+        # FIRST for analytics questions: the computed flag IS the answer, and
+        # buried mid-prompt the model hedges around it (verified failure)
+        if not quality:
+            return
+        for eq in graph:
+            if not eq or not eq.get("tag") or not eq.get("anchored"):
+                continue
+            if eq.get("kpis"):
+                by_pm = {}
+                for k in eq["kpis"]:
+                    by_pm.setdefault((k["process_id"], k["metric"]), []).append(k)
+                kpi_lines = []
+                for (pid, metric), vals in sorted(by_pm.items()):
+                    descr = vals[0].get("descr") or ""
+                    vals.sort(key=lambda k: k["period"])
+                    series = " | ".join(f"{v['period']}={v['value']}"
+                                        for v in vals[-4:])
+                    flag = ""
+                    d = STANDARDS_PACK["kpi_defs"].get(metric, {})
+                    if metric == "CPK" and vals[-1]["value"] < d.get("min", 0):
+                        flag = (f"   -> BELOW {d['min']} MINIMUM: NOT CAPABLE "
+                                "(clause 9.1)")
+                    if (metric == "PPM" and len(vals) >= 3 and
+                            vals[-1]["value"] > vals[-2]["value"]
+                            > vals[-3]["value"]):
+                        flag = ("   -> RISING 3 CONSECUTIVE MONTHS: "
+                                "INVESTIGATE (clause 9.1)")
+                    kpi_lines.append(
+                        f"  {pid} ({descr} process) {metric}: {series}{flag}")
+                add("kpi", f"{eq['tag']} computed quality KPIs "
+                    "(structured store — computed, never embedded)",
+                    "\n".join(kpi_lines), tag=eq["tag"], hop=0,
+                    query="MATCH (q:QualityKPI {tag: $tag}) RETURN q.process_id,"
+                          " q.metric, q.period, q.value ORDER BY q.period")
+            if eq.get("ncrs"):
+                ncr_lines = "\n".join(
+                    f"  {n['ncr_id']}  {n['date']}  [{n['status']}] clause "
+                    f"{n['clause']}: {n['description'][:110]}"
+                    for n in sorted(eq["ncrs"], key=lambda n: n["date"],
+                                    reverse=True)[:4])
+                add("ncr", f"{eq['tag']} nonconformance register "
+                    "(clause-linked)", ncr_lines, tag=eq["tag"], hop=1,
+                    ncr_ids=[n["ncr_id"] for n in eq["ncrs"][:4]])
+
+    # computed analytics first (they ARE the answer for capability/trend
+    # questions), then clauses, then spec 8 ordering: graph facts lead for
+    # equipment-anchored questions, text leads otherwise
+    add_quality()
     add_clauses()
     if blend["graph"] >= 0.5:
         add_graph()
@@ -385,6 +407,10 @@ def synthesis_prompt(question, blocks):
         "order answers a vibration question; report the closest documented "
         "events rather than abstaining when directly relevant records exist. "
         "Answer the question as asked, summarising the matching records plainly. "
+        "Evidence marked 'computed' is an authoritative calculation from the "
+        "structured quality store: flags such as NOT CAPABLE or RISING are the "
+        "direct answer to capability and trend questions — state them as the "
+        "answer with their numbers, do not hedge around them. "
         f"If the evidence does not contain the answer, reply exactly: {ABSTAIN_TEXT}\n\n"
         + "\n\n".join(blocks)
         + f"\n\nQuestion: {question}\nAnswer:"
