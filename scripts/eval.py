@@ -46,6 +46,13 @@ CASES = [
     {"q": "What is the boiler feedwater treatment procedure?", "abstain": True},
     {"q": "What is the turbine lube oil specification?", "abstain": True},
     {"q": "Who is the plant manager of Plant Site A?", "abstain": True},
+    # shapes fixed in df4e56b — class/area anchoring + inspection evidence
+    {"q": "What is the failure history of the control valves in the process area?",
+     "abstain": False, "cite_any": ["CV-301A", "CV-302A"]},
+    {"q": "Have any control valve inspections expired?",
+     "abstain": False, "cite_any": ["CV-301A"]},
+    {"q": "Have any of the heat exchangers overheated?",
+     "abstain": False, "cite_any": ["HX-"]},
 ]
 
 MODES = ["full", "dense", "bm25", "no_graph"]
