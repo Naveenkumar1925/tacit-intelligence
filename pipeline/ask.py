@@ -12,6 +12,9 @@ Design (spec):
   Synth   - every claim carries [n] resolving to doc+page or audio timestamp.
   Confidence = 0.4*top_dense + 0.3*cited_sentence_fraction + 0.3*bm25/dense overlap.
   Below threshold -> abstain ("not present in the corpus" is the correct answer).
+
+ask_stream() yields the same answer token-by-token for the UI (SSE); ask() is the
+blocking form. `mode` supports the eval ablations: full | dense | bm25 | no_graph.
 """
 
 import json
@@ -30,6 +33,10 @@ from resolve import find_mentions
 
 TOP_K = 8
 MAX_TEXT_EVIDENCE = 5
+MAX_CHUNK_CHARS = 2800          # full chunk: truncating cut SOP-114's interval line
+MAX_ANSWER_TOKENS = 350
+LLM_OPTIONS = {"temperature": 0.1, "num_predict": MAX_ANSWER_TOKENS,
+               "num_ctx": 6144}  # 4096 silently clips long evidence prompts
 CONFIDENCE_THRESHOLD = 0.45
 ABSTAIN_TEXT = "Not present in the corpus."
 
@@ -77,6 +84,25 @@ RETURN dense, sparse,
   }] AS graph
 """
 
+_driver = None
+_register = None            # canonical-key -> tag, cached per process
+
+
+def get_driver():
+    global _driver
+    if _driver is None:
+        _driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD),
+                                       notifications_min_severity="OFF")
+    return _driver
+
+
+def get_register(session):
+    global _register
+    if not _register:
+        _register = {r["key"]: r["tag"] for r in session.run(
+            "MATCH (e:Equipment) RETURN replace(e.tag,'-','') AS key, e.tag AS tag")}
+    return _register
+
 
 def ollama(path, payload, timeout=300):
     req = urllib.request.Request(
@@ -84,6 +110,26 @@ def ollama(path, payload, timeout=300):
         headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.loads(r.read())
+
+
+def ollama_chat_stream(prompt):
+    """Yield content tokens from a streaming chat call."""
+    req = urllib.request.Request(
+        f"{OLLAMA_BASE_URL}/api/chat",
+        data=json.dumps({"model": LLM_MODEL, "stream": True,
+                         "messages": [{"role": "user", "content": prompt}],
+                         "options": LLM_OPTIONS}).encode(),
+        headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        for line in r:
+            if not line.strip():
+                continue
+            chunk = json.loads(line)
+            tok = chunk.get("message", {}).get("content", "")
+            if tok:
+                yield tok
+            if chunk.get("done"):
+                return
 
 
 def lucene_sanitise(q):
@@ -117,66 +163,67 @@ def build_evidence(fused, graph, blend):
 
     def add(kind, label, text, **meta):
         n = len(blocks) + 1
-        blocks.append(f"[{n}] {label}\n{text}")
+        # [E1]-style markers: plain [1] collides with the SOPs' own numbered
+        # sections and the model starts citing section numbers instead
+        blocks.append(f"[E{n}] {label}\n{text}")
         citations.append({"n": n, "kind": kind, "label": label, **meta})
         return n
 
     n_text = MAX_TEXT_EVIDENCE if blend["text"] >= 0.5 else 3
     for f in fused[:n_text]:
         c = f["item"]
-        add("chunk", f"{c['doc']} page {c['page']}", c["text"][:1200],
+        add("chunk", f"{c['doc']} page {c['page']}", c["text"][:MAX_CHUNK_CHARS],
             doc=c["doc"], page=c["page"], chunk_id=c["id"], score=round(f["rrf"], 4))
 
-    for eq in graph:
-        if not eq or not eq.get("tag"):
-            continue
+    # full history + siblings only for equipment the question actually named;
+    # mention-derived equipment contributes operator knowledge only — a wall of
+    # unrelated histories drowns the answer and pollutes citations
+    for eq in sorted((e for e in graph if e and e.get("tag")),
+                     key=lambda e: not e.get("anchored")):
         hop = 0 if eq.get("anchored") else 1
-        wos = sorted(eq["work_orders"], key=lambda w: w["date"], reverse=True)
-        corr = [w for w in wos if w["type"] == "corrective"][:8]
-        if corr:
-            lines = "\n".join(
-                f"  {w['date']}  {w['code'] or '-'}  {w['hrs']}h  {w['desc'][:90]}"
-                for w in corr)
-            add("history", f"{eq['tag']} corrective work order history "
-                f"(class {eq['class']}, criticality {eq['criticality']})",
-                lines, tag=eq["tag"], hop=hop,
-                wo_ids=[w["wo_id"] for w in corr])
-        for t in eq["tacit"][:4]:
+        if eq.get("anchored"):
+            wos = sorted(eq["work_orders"], key=lambda w: w["date"], reverse=True)
+            corr = [w for w in wos if w["type"] == "corrective"][:8]
+            if corr:
+                lines = "\n".join(
+                    f"  {w['date']}  {w['code'] or '-'}  {w['hrs']}h  {w['desc'][:90]}"
+                    for w in corr)
+                add("history", f"{eq['tag']} corrective work order history "
+                    f"(class {eq['class']}, criticality {eq['criticality']})",
+                    lines, tag=eq["tag"], hop=hop,
+                    wo_ids=[w["wo_id"] for w in corr])
+            if eq["siblings"]:
+                sib_lines = "\n".join(
+                    f"  {s['tag']} (criticality {s['criticality']}) past failure modes: "
+                    f"{sorted(set(c for c in s['codes'] if c)) or 'none'}"
+                    for s in eq["siblings"])
+                add("siblings", f"Same-class equipment as {eq['tag']} ({eq['class']})",
+                    sib_lines, tag=eq["tag"], hop=2)
+        for t in eq["tacit"][:4 if eq.get("anchored") else 2]:
             add("tacit", f"Operator knowledge ({t['lang']} audio {t['audio']} "
                 f"@ {t['t_start']:.0f}s)", t["text"],
                 audio=t["audio"], t_start=t["t_start"], lang=t["lang"],
                 claim_id=t["claim_id"], hop=hop)
-        if eq["siblings"] and eq.get("anchored"):
-            sib_lines = "\n".join(
-                f"  {s['tag']} (criticality {s['criticality']}) past failure modes: "
-                f"{sorted(set(c for c in s['codes'] if c)) or 'none'}"
-                for s in eq["siblings"])
-            add("siblings", f"Same-class equipment as {eq['tag']} ({eq['class']})",
-                sib_lines, tag=eq["tag"], hop=2)
     return blocks, citations
 
 
-def synthesise(question, blocks):
-    prompt = (
+def synthesis_prompt(question, blocks):
+    return (
         "You are the plant knowledge assistant. Answer the question using ONLY the "
-        "numbered evidence below. Every sentence of your answer MUST end with its "
-        "citation marker(s) like [1] or [2][3]. Be specific: dates, counts, hours. "
+        "evidence below, which is numbered [E1], [E2], ... Every sentence of your "
+        "answer MUST end with the marker(s) of the evidence that directly supports "
+        "it, like [E1] or [E2][E3] — never a blanket list, and never numbers that "
+        "are not evidence markers. Be specific: dates, counts, hours. "
         f"If the evidence does not contain the answer, reply exactly: {ABSTAIN_TEXT}\n\n"
         + "\n\n".join(blocks)
         + f"\n\nQuestion: {question}\nAnswer:"
     )
-    out = ollama("/api/chat", {
-        "model": LLM_MODEL, "stream": False,
-        "messages": [{"role": "user", "content": prompt}],
-        "options": {"temperature": 0.1},
-    })
-    return out["message"]["content"].strip()
 
 
 def confidence(answer, fused, dense, sparse):
     top_dense = dense[0]["score"] if dense else 0.0           # cosine, already 0..1
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", answer) if s.strip()]
-    cited = sum(1 for s in sentences if re.search(r"\[\d+\]", s))
+    cited = sum(1 for s in sentences if re.search(r"\[E\d+\]", s))
     frac = cited / len(sentences) if sentences else 0.0
     d_ids = {d["id"] for d in dense[:TOP_K]}
     s_ids = {s["id"] for s in sparse[:TOP_K]}
@@ -186,53 +233,90 @@ def confidence(answer, fused, dense, sparse):
         "bm25_dense_overlap": round(overlap, 3)}
 
 
-_driver = None
-
-def get_driver():
-    global _driver
-    if _driver is None:
-        _driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
-    return _driver
-
-
-def ask(question):
+def _retrieve(question, mode="full"):
+    """Shared retrieval + evidence assembly. Returns a working dict."""
     t0 = time.time()
-    keys = find_mentions(question)
     with get_driver().session(database=NEO4J_DATABASE) as s:
-        register = {r["key"]: r["tag"] for r in s.run(
-            "MATCH (e:Equipment) RETURN replace(e.tag,'-','') AS key, e.tag AS tag")}
-        tags = sorted({register[k] for k in keys if k in register})
+        register = get_register(s)
+        tags = sorted({register[k] for k in find_mentions(question) if k in register})
         qvec = ollama("/api/embed", {"model": EMBED_MODEL, "input": [question]}
                       )["embeddings"][0]
         rec = s.run(RETRIEVAL_QUERY, qvec=qvec, ftq=lucene_sanitise(question),
                     tags=tags, k=TOP_K).single()
     dense, sparse, graph = rec["dense"], rec["sparse"], rec["graph"]
 
+    # ablation modes for the eval harness (spec Day 3): starve one leg and
+    # re-rank honestly with what remains
+    if mode == "dense":
+        sparse = []
+    elif mode == "bm25":
+        dense = []
+    elif mode == "no_graph":
+        graph = []
+
     intent, blend = classify_intent(question, tags)
     fused = rrf_fuse(dense, sparse)
     blocks, citations = build_evidence(fused, graph, blend)
+    return {"t0": t0, "tags": tags, "dense": dense, "sparse": sparse,
+            "graph": graph, "intent": intent, "blend": blend,
+            "fused": fused, "blocks": blocks, "citations": citations}
 
-    if not blocks:
-        return {"answer": ABSTAIN_TEXT, "abstained": True, "confidence": 0.0,
-                "confidence_parts": {}, "citations": [], "intent": intent,
-                "tags": tags, "elapsed_s": round(time.time() - t0, 2),
-                "query": RETRIEVAL_QUERY}
 
-    answer = synthesise(question, blocks)
-    conf, parts = confidence(answer, fused, dense, sparse)
+def _finalise(question, answer, w):
+    conf, parts = confidence(answer, w["fused"], w["dense"], w["sparse"])
     abstained = ABSTAIN_TEXT.lower() in answer.lower() or conf < CONFIDENCE_THRESHOLD
     if conf < CONFIDENCE_THRESHOLD and ABSTAIN_TEXT.lower() not in answer.lower():
         answer = (f"{ABSTAIN_TEXT} (Confidence {conf} is below the "
                   f"{CONFIDENCE_THRESHOLD} threshold; refusing to guess.)")
-    used = {int(n) for n in re.findall(r"\[(\d+)\]", answer)}
+    used = {int(n) for n in re.findall(r"\[E(\d+)\]", answer)}
     return {
         "answer": answer, "abstained": abstained,
         "confidence": conf, "confidence_parts": parts,
-        "citations": [c for c in citations if c["n"] in used] or citations,
-        "intent": intent, "blend": blend, "tags": tags,
-        "elapsed_s": round(time.time() - t0, 2),
+        "citations": [c for c in w["citations"] if c["n"] in used] or w["citations"],
+        "intent": w["intent"], "blend": w["blend"], "tags": w["tags"],
+        "elapsed_s": round(time.time() - w["t0"], 2),
         "query": RETRIEVAL_QUERY,
     }
+
+
+def ask(question, mode="full"):
+    w = _retrieve(question, mode)
+    if not w["blocks"]:
+        return {"answer": ABSTAIN_TEXT, "abstained": True, "confidence": 0.0,
+                "confidence_parts": {}, "citations": [], "intent": w["intent"],
+                "tags": w["tags"], "elapsed_s": round(time.time() - w["t0"], 2),
+                "query": RETRIEVAL_QUERY}
+    out = ollama("/api/chat", {
+        "model": LLM_MODEL, "stream": False,
+        "messages": [{"role": "user",
+                      "content": synthesis_prompt(question, w["blocks"])}],
+        "options": LLM_OPTIONS,
+    })
+    return _finalise(question, out["message"]["content"].strip(), w)
+
+
+def ask_stream(question):
+    """Generator of SSE-ready dicts: {'type':'token'|'final', ...}."""
+    w = _retrieve(question)
+    if not w["blocks"]:
+        yield {"type": "final", **_finalise(question, ABSTAIN_TEXT, w)}
+        return
+    parts = []
+    for tok in ollama_chat_stream(synthesis_prompt(question, w["blocks"])):
+        parts.append(tok)
+        yield {"type": "token", "text": tok}
+    yield {"type": "final", **_finalise(question, "".join(parts).strip(), w)}
+
+
+def prewarm():
+    """Load models + register cache so the first demo question is warm."""
+    with get_driver().session(database=NEO4J_DATABASE) as s:
+        get_register(s)
+    ollama("/api/embed", {"model": EMBED_MODEL, "input": ["warm"]})
+    ollama("/api/chat", {"model": LLM_MODEL, "stream": False,
+                         "messages": [{"role": "user", "content": "Say OK."}],
+                         "options": {"num_predict": 5}})
+    return "warm"
 
 
 if __name__ == "__main__":

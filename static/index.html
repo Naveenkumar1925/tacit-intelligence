@@ -155,16 +155,34 @@ async function ask(){
   const q = $('question').value.trim(); if(!q) return;
   $('question').value = ''; $('askbtn').disabled = true;
   bubble('q', esc(q));
-  const wait = bubble('a', '<span style="color:var(--dim)">thinking…</span>');
+  const live = bubble('a', '<span style="color:var(--dim)">retrieving…</span>');
   startWatchClock();
   try {
-    const r = await fetch('/api/ask', {method:'POST',
+    const resp = await fetch('/api/ask/stream', {method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({question:q})}).then(x=>x.json());
-    stopWatchClock(r.elapsed_s);
-    wait.remove();
-    renderAnswer(r);
-  } catch(e){ stopWatchClock(null); wait.innerHTML = 'error: '+esc(String(e)); }
+      body: JSON.stringify({question:q})});
+    const reader = resp.body.getReader(), dec = new TextDecoder();
+    let buf = '', text = '', final = null;
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      buf += dec.decode(value, {stream:true});
+      let idx;
+      while((idx = buf.indexOf('\n\n')) >= 0){
+        const line = buf.slice(0, idx).trim(); buf = buf.slice(idx + 2);
+        if(!line.startsWith('data:')) continue;
+        const ev = JSON.parse(line.slice(5));
+        if(ev.type === 'token'){
+          text += ev.text;
+          live.textContent = text;
+          $('chat').scrollTop = 1e9;
+        } else if(ev.type === 'final'){ final = ev; }
+      }
+    }
+    stopWatchClock(final ? final.elapsed_s : null);
+    live.remove();
+    if(final) renderAnswer(final);
+  } catch(e){ stopWatchClock(null); live.innerHTML = 'error: '+esc(String(e)); }
   $('askbtn').disabled = false;
 }
 
@@ -172,8 +190,8 @@ function esc(s){ const d=document.createElement('div'); d.textContent=s; return 
 
 function renderAnswer(r){
   const cmap = {}; (r.citations||[]).forEach(c => cmap[c.n] = c);
-  let html = esc(r.answer).replace(/\[(\d+)\]/g, (m,n) =>
-    `<span class="cite" onclick='openCite(${n})' title="${esc(citeTitle(cmap[n]))}">[${n}]</span>`);
+  let html = esc(r.answer).replace(/\[E(\d+)\]/g, (m,n) =>
+    `<span class="cite" onclick='openCite(${n})' title="${esc(citeTitle(cmap[n]))}">[E${n}]</span>`);
   const conf = r.confidence, color = conf >= .65 ? 'var(--ok)' : conf >= .45 ? 'var(--warn)' : 'var(--bad)';
   const parts = r.confidence_parts || {};
   html += `<div class="meta">

@@ -16,12 +16,14 @@ generated for alerts that don't have one yet, so sweeps stay cheap.
 
 import json
 import sys
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 ROOT = Path(__file__).resolve().parent
@@ -32,7 +34,28 @@ from neo4j import GraphDatabase                                             # no
 import ask as ask_mod                                                       # noqa: E402
 import watch as watch_mod                                                   # noqa: E402
 
-app = FastAPI(title="Plant Brain")
+scheduler = BackgroundScheduler()
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    threading.Thread(target=_prewarm_safe, daemon=True).start()
+    scheduler.add_job(lambda: watch_mod.sweep(write=True, with_narrative=True),
+                      "interval", minutes=30, id="watch")
+    scheduler.start()
+    yield
+    scheduler.shutdown(wait=False)
+
+
+def _prewarm_safe():
+    try:
+        ask_mod.prewarm()
+        print("prewarm: models loaded, register cached")
+    except Exception as e:
+        print(f"prewarm failed (will warm on first question): {e}")
+
+
+app = FastAPI(title="Plant Brain", lifespan=lifespan)
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD),
                               notifications_min_severity="OFF")
 
@@ -44,6 +67,16 @@ class Question(BaseModel):
 @app.post("/api/ask")
 def api_ask(q: Question):
     return ask_mod.ask(q.question)
+
+
+@app.post("/api/ask/stream")
+def api_ask_stream(q: Question):
+    def gen():
+        for event in ask_mod.ask_stream(q.question):
+            yield f"data: {json.dumps(event)}\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
 
 
 @app.get("/api/alerts")
@@ -104,16 +137,6 @@ def api_audio(name: str):
 @app.get("/", response_class=HTMLResponse)
 def index():
     return (ROOT / "static" / "index.html").read_text(encoding="utf-8")
-
-
-scheduler = BackgroundScheduler()
-scheduler.add_job(lambda: watch_mod.sweep(write=True, with_narrative=True),
-                  "interval", minutes=30, id="watch")
-
-
-@app.on_event("startup")
-def startup():
-    scheduler.start()
 
 
 if __name__ == "__main__":

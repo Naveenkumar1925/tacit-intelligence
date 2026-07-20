@@ -75,8 +75,10 @@ def narrative(alert):
     try:
         return ollama_chat(
             "Write a 2-3 sentence maintenance alert narrative for plant staff. "
-            "Factual, no speculation beyond the data given, mention the business "
-            f"impact number. Data: {json.dumps(alert, default=str)}")
+            "Use ONLY facts and numbers present in the data below — never invent "
+            "costs, currency amounts, dates or schedules that are not in the data. "
+            "State the avoidable downtime hours as the business impact. "
+            f"Data: {json.dumps(alert, default=str)}")
     except Exception as e:
         return f"(narrative unavailable: {e})"
 
