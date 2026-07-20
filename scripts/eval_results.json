@@ -1,0 +1,566 @@
+{
+ "summary": {
+  "full": {
+   "passed": 15,
+   "total": 15,
+   "mean_latency": 11.0
+  },
+  "dense": {
+   "passed": 10,
+   "total": 15,
+   "mean_latency": 10.4
+  },
+  "bm25": {
+   "passed": 3,
+   "total": 15,
+   "mean_latency": 10.6
+  },
+  "no_graph": {
+   "passed": 11,
+   "total": 15,
+   "mean_latency": 15.4
+  }
+ },
+ "results": [
+  {
+   "q": "P-101A keeps tripping on high vibration - has this happened before?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.591,
+   "elapsed_s": 11.3,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 VIB events listed first | SOP-110 | SOP-110-c01 | SOP-110 page 1"
+  },
+  {
+   "q": "How often should the suction strainers on the P-101 pumps be cleaned?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.801,
+   "elapsed_s": 11.3,
+   "cited": "SOP-114 | SOP-114-c02 | SOP-114 page 2"
+  },
+  {
+   "q": "What is the procedure for replacing a mechanical seal on a process pump?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.587,
+   "elapsed_s": 20.3,
+   "cited": "SOP-103 | SOP-103-c01 | SOP-103 page 1"
+  },
+  {
+   "q": "Which pumps share the same class as P-101A and what failures have they had?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.822,
+   "elapsed_s": 11.6,
+   "cited": "P-101A | Same-class equipment as P-101A (centrifugal_pump)"
+  },
+  {
+   "q": "What safety precautions apply before opening a heat exchanger?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.552,
+   "elapsed_s": 11.9,
+   "cited": "SOP-105 | SOP-105-c01 | SOP-105 page 1"
+  },
+  {
+   "q": "The pump will not build discharge pressure after starting - what should I check?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.727,
+   "elapsed_s": 10.7,
+   "cited": "SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c03 | SOP-101 page 2"
+  },
+  {
+   "q": "How much downtime have seal failures caused on P-101A?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.747,
+   "elapsed_s": 6.4,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 SER events listed first"
+  },
+  {
+   "q": "How do I verify a control valve positioner is calibrated correctly?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.614,
+   "elapsed_s": 27.6,
+   "cited": "SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-108 | SOP-108-c02 | SOP-108 page 2"
+  },
+  {
+   "q": "What does lock-out tag-out require before intrusive work can start?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.587,
+   "elapsed_s": 9.7,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-118 | SOP-118-c02 | SOP-118 page 2"
+  },
+  {
+   "q": "Has HX-202A had fouling or overheating problems?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.77,
+   "elapsed_s": 6.8,
+   "cited": "HX-202A | HX-202A corrective work order history (class heat_exchanger, criticality low) \u2014 OHE events listed first | HX-202A | Same-class equipment as HX-202A (heat_exchanger)"
+  },
+  {
+   "q": "What vibration level requires the machine to be shut down?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.825,
+   "elapsed_s": 7.3,
+   "cited": "SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-116 | SOP-116-c03 | SOP-116 page 2 | SOP-110 | SOP-110-c03 | SOP-110 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "What happened the last time a plugged strainer tripped P-101A?",
+   "mode": "full",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.634,
+   "elapsed_s": 10.2,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 PLU events listed first"
+  },
+  {
+   "q": "What is the boiler feedwater treatment procedure?",
+   "mode": "full",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.549,
+   "elapsed_s": 5.3,
+   "cited": "SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-105 | SOP-105-c03 | SOP-105 page 2 | SOP-105 | SOP-105-c02 | SOP-105 page 2 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "What is the turbine lube oil specification?",
+   "mode": "full",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.366,
+   "elapsed_s": 7.3,
+   "cited": "SOP-110 | SOP-110-c02 | SOP-110 page 2 | SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-103 | SOP-103-c02 | SOP-103 page 2 | SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page"
+  },
+  {
+   "q": "Who is the plant manager of Plant Site A?",
+   "mode": "full",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.613,
+   "elapsed_s": 7.0,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "P-101A keeps tripping on high vibration - has this happened before?",
+   "mode": "dense",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.416,
+   "elapsed_s": 9.3,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 VIB events listed first | P-101A | Same-class equipment as P-101A (centrifugal_pump) | SOP-110 | SOP-110-c01 "
+  },
+  {
+   "q": "How often should the suction strainers on the P-101 pumps be cleaned?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.551,
+   "elapsed_s": 10.7,
+   "cited": "SOP-114 | SOP-114-c02 | SOP-114 page 2"
+  },
+  {
+   "q": "What is the procedure for replacing a mechanical seal on a process pump?",
+   "mode": "dense",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.422,
+   "elapsed_s": 26.9,
+   "cited": "SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-103 | SOP-103-c03 | SOP-103 page 2 | SOP-103 | SOP-103-c02 | SOP-103 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page"
+  },
+  {
+   "q": "Which pumps share the same class as P-101A and what failures have they had?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.635,
+   "elapsed_s": 10.8,
+   "cited": "P-101A | Same-class equipment as P-101A (centrifugal_pump)"
+  },
+  {
+   "q": "What safety precautions apply before opening a heat exchanger?",
+   "mode": "dense",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.44,
+   "elapsed_s": 8.9,
+   "cited": "SOP-105 | SOP-105-c01 | SOP-105 page 1 | SOP-105 | SOP-105-c03 | SOP-105 page 2 | SOP-118 | SOP-118-c02 | SOP-118 page 2 | SOP-105 | SOP-105-c02 | SOP-105 page 2 | SOP-118 | SOP-118-c01 | SOP-118 page"
+  },
+  {
+   "q": "The pump will not build discharge pressure after starting - what should I check?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.539,
+   "elapsed_s": 9.4,
+   "cited": "SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c03 | SOP-101 page 2"
+  },
+  {
+   "q": "How much downtime have seal failures caused on P-101A?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.635,
+   "elapsed_s": 6.1,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 SER events listed first"
+  },
+  {
+   "q": "How do I verify a control valve positioner is calibrated correctly?",
+   "mode": "dense",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.373,
+   "elapsed_s": 20.0,
+   "cited": "SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-108 | SOP-108-c02 | SOP-108 page 2 | SOP-108 | SOP-108-c03 | SOP-108 page 2 | SOP-116 | SOP-116-c02 | SOP-116 page 2 | SOP-101 | SOP-101-c02 | SOP-101 page"
+  },
+  {
+   "q": "What does lock-out tag-out require before intrusive work can start?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.624,
+   "elapsed_s": 12.7,
+   "cited": "SOP-118 | SOP-118-c02 | SOP-118 page 2 | SOP-118 | SOP-118-c03 | SOP-118 page 2"
+  },
+  {
+   "q": "Has HX-202A had fouling or overheating problems?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.62,
+   "elapsed_s": 5.5,
+   "cited": "HX-202A | HX-202A corrective work order history (class heat_exchanger, criticality low) \u2014 OHE events listed first | SOP-116 | SOP-116-c02 | SOP-116 page 2"
+  },
+  {
+   "q": "What vibration level requires the machine to be shut down?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.637,
+   "elapsed_s": 6.9,
+   "cited": "SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-110 | SOP-110-c03 | SOP-110 page 2 | SOP-116 | SOP-116-c03 | SOP-116 page 2 | SOP-101 | SOP-101-c03 | SOP-101 page 2 | SOP-118 | SOP-118-c01 | SOP-118 page"
+  },
+  {
+   "q": "What happened the last time a plugged strainer tripped P-101A?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.634,
+   "elapsed_s": 8.1,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 PLU events listed first"
+  },
+  {
+   "q": "What is the boiler feedwater treatment procedure?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.324,
+   "elapsed_s": 6.7,
+   "cited": "SOP-105 | SOP-105-c01 | SOP-105 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-105 | SOP-105-c02 | SOP-105 page 2 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-105 | SOP-105-c03 | SOP-105 page"
+  },
+  {
+   "q": "What is the turbine lube oil specification?",
+   "mode": "dense",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.329,
+   "elapsed_s": 7.1,
+   "cited": "SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page"
+  },
+  {
+   "q": "Who is the plant manager of Plant Site A?",
+   "mode": "dense",
+   "pass": false,
+   "abstained": false,
+   "confidence": 0.613,
+   "elapsed_s": 7.4,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-110 | SOP-110-c01 | SOP-110 page"
+  },
+  {
+   "q": "P-101A keeps tripping on high vibration - has this happened before?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.2,
+   "elapsed_s": 10.1,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 VIB events listed first | P-101A | Same-class equipment as P-101A (centrifugal_pump) | SOP-101 | SOP-101-c01 "
+  },
+  {
+   "q": "How often should the suction strainers on the P-101 pumps be cleaned?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.15,
+   "elapsed_s": 9.5,
+   "cited": "SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-114 | SOP-114-c02 | SOP-114 page 2 | SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-110 | SOP-110-c02 | SOP-110 page"
+  },
+  {
+   "q": "What is the procedure for replacing a mechanical seal on a process pump?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.075,
+   "elapsed_s": 14.9,
+   "cited": "SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page"
+  },
+  {
+   "q": "Which pumps share the same class as P-101A and what failures have they had?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 10.9,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) | P-101A | Same-class equipment as P-101A (centrifugal_pump) | SOP-110 | SOP-110-c02 | SOP-110 page 2 | SOP-103"
+  },
+  {
+   "q": "What safety precautions apply before opening a heat exchanger?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.2,
+   "elapsed_s": 10.3,
+   "cited": "SOP-105 | SOP-105-c01 | SOP-105 page 1 | SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page"
+  },
+  {
+   "q": "The pump will not build discharge pressure after starting - what should I check?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.2,
+   "elapsed_s": 9.8,
+   "cited": "SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c03 | SOP-101 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-103 | SOP-103-c02 | SOP-103 page 2 | SOP-108 | SOP-108-c02 | SOP-108 page"
+  },
+  {
+   "q": "How much downtime have seal failures caused on P-101A?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 6.3,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 SER events listed first | P-101A | Same-class equipment as P-101A (centrifugal_pump) | SOP-103 | SOP-103-c01 "
+  },
+  {
+   "q": "How do I verify a control valve positioner is calibrated correctly?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.016,
+   "elapsed_s": 29.8,
+   "cited": "SOP-108 | SOP-108-c02 | SOP-108 page 2 | SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-108 | SOP-108-c03 | SOP-108 page 2 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-110 | SOP-110-c02 | SOP-110 page"
+  },
+  {
+   "q": "What does lock-out tag-out require before intrusive work can start?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 10.0,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-110 | SOP-110-c02 | SOP-110 page 2 | SOP-118 | SOP-118-c02 | SOP-118 page 2 | SOP-108 | SOP-108-c01 | SOP-108 page"
+  },
+  {
+   "q": "Has HX-202A had fouling or overheating problems?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 5.6,
+   "cited": "HX-202A | HX-202A corrective work order history (class heat_exchanger, criticality low) \u2014 OHE events listed first | HX-202A | Same-class equipment as HX-202A (heat_exchanger) | SOP-116 | SOP-116-c02 |"
+  },
+  {
+   "q": "What vibration level requires the machine to be shut down?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.15,
+   "elapsed_s": 7.7,
+   "cited": "SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-116 | SOP-116-c02 | SOP-116 page 2"
+  },
+  {
+   "q": "What happened the last time a plugged strainer tripped P-101A?",
+   "mode": "bm25",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 6.9,
+   "cited": "P-101A | P-101A corrective work order history (class centrifugal_pump, criticality high) \u2014 PLU events listed first | P-101A | Same-class equipment as P-101A (centrifugal_pump) | SOP-114 | SOP-114-c01 "
+  },
+  {
+   "q": "What is the boiler feedwater treatment procedure?",
+   "mode": "bm25",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.3,
+   "elapsed_s": 7.4,
+   "cited": "SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-105 | SOP-105-c03 | SOP-105 page 2 | SOP-116 | SOP-116-c02 | SOP-116 page 2 | SOP-105 | SOP-105-c02 | SOP-105 page 2 | SOP-118 | SOP-118-c01 | SOP-118 page"
+  },
+  {
+   "q": "What is the turbine lube oil specification?",
+   "mode": "bm25",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.0,
+   "elapsed_s": 8.1,
+   "cited": "SOP-103 | SOP-103-c02 | SOP-103 page 2 | SOP-110 | SOP-110-c02 | SOP-110 page 2 | SOP-108 | SOP-108-c02 | SOP-108 page 2 | SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "Who is the plant manager of Plant Site A?",
+   "mode": "bm25",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.0,
+   "elapsed_s": 11.8,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-108 | SOP-108-c01 | SOP-108 page"
+  },
+  {
+   "q": "P-101A keeps tripping on high vibration - has this happened before?",
+   "mode": "no_graph",
+   "pass": false,
+   "abstained": false,
+   "confidence": 0.691,
+   "elapsed_s": 17.8,
+   "cited": "SOP-114 | SOP-114-c02 | SOP-114 page 2 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-110 | SOP-110-c01 | SOP-110 page 1"
+  },
+  {
+   "q": "How often should the suction strainers on the P-101 pumps be cleaned?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.651,
+   "elapsed_s": 13.5,
+   "cited": "SOP-114 | SOP-114-c02 | SOP-114 page 2"
+  },
+  {
+   "q": "What is the procedure for replacing a mechanical seal on a process pump?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.65,
+   "elapsed_s": 16.2,
+   "cited": "SOP-103 | SOP-103-c01 | SOP-103 page 1"
+  },
+  {
+   "q": "Which pumps share the same class as P-101A and what failures have they had?",
+   "mode": "no_graph",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.747,
+   "elapsed_s": 17.5,
+   "cited": "SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page 1 | SOP-116 | SOP-116-c02 | SOP-116 page 2"
+  },
+  {
+   "q": "What safety precautions apply before opening a heat exchanger?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.552,
+   "elapsed_s": 9.4,
+   "cited": "SOP-105 | SOP-105-c01 | SOP-105 page 1"
+  },
+  {
+   "q": "The pump will not build discharge pressure after starting - what should I check?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.727,
+   "elapsed_s": 13.0,
+   "cited": "SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-101 | SOP-101-c03 | SOP-101 page 2"
+  },
+  {
+   "q": "How much downtime have seal failures caused on P-101A?",
+   "mode": "no_graph",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.447,
+   "elapsed_s": 6.2,
+   "cited": "SOP-103 | SOP-103-c03 | SOP-103 page 2 | SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-103 | SOP-103-c02 | SOP-103 page 2"
+  },
+  {
+   "q": "How do I verify a control valve positioner is calibrated correctly?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.595,
+   "elapsed_s": 26.7,
+   "cited": "SOP-108 | SOP-108-c01 | SOP-108 page 1 | SOP-108 | SOP-108-c02 | SOP-108 page 2"
+  },
+  {
+   "q": "What does lock-out tag-out require before intrusive work can start?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.512,
+   "elapsed_s": 15.9,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-118 | SOP-118-c02 | SOP-118 page 2"
+  },
+  {
+   "q": "Has HX-202A had fouling or overheating problems?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.77,
+   "elapsed_s": 13.4,
+   "cited": "SOP-116 | SOP-116-c02 | SOP-116 page 2 | SOP-105 | SOP-105-c01 | SOP-105 page 1"
+  },
+  {
+   "q": "What vibration level requires the machine to be shut down?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": false,
+   "confidence": 0.825,
+   "elapsed_s": 16.8,
+   "cited": "SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-101 | SOP-101-c02 | SOP-101 page 2 | SOP-116 | SOP-116-c03 | SOP-116 page 2 | SOP-110 | SOP-110-c03 | SOP-110 page 2 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "What happened the last time a plugged strainer tripped P-101A?",
+   "mode": "no_graph",
+   "pass": false,
+   "abstained": true,
+   "confidence": 0.634,
+   "elapsed_s": 14.5,
+   "cited": "SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-114 | SOP-114-c02 | SOP-114 page 2"
+  },
+  {
+   "q": "What is the boiler feedwater treatment procedure?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.549,
+   "elapsed_s": 15.4,
+   "cited": "SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-105 | SOP-105-c03 | SOP-105 page 2 | SOP-105 | SOP-105-c02 | SOP-105 page 2 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  },
+  {
+   "q": "What is the turbine lube oil specification?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.366,
+   "elapsed_s": 10.8,
+   "cited": "SOP-110 | SOP-110-c02 | SOP-110 page 2 | SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-103 | SOP-103-c02 | SOP-103 page 2 | SOP-103 | SOP-103-c01 | SOP-103 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page"
+  },
+  {
+   "q": "Who is the plant manager of Plant Site A?",
+   "mode": "no_graph",
+   "pass": true,
+   "abstained": true,
+   "confidence": 0.763,
+   "elapsed_s": 23.9,
+   "cited": "SOP-118 | SOP-118-c01 | SOP-118 page 1 | SOP-116 | SOP-116-c01 | SOP-116 page 1 | SOP-110 | SOP-110-c01 | SOP-110 page 1 | SOP-114 | SOP-114-c01 | SOP-114 page 1 | SOP-101 | SOP-101-c01 | SOP-101 page"
+  }
+ ]
+}
