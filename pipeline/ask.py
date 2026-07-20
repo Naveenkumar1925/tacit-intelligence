@@ -147,6 +147,22 @@ def rrf_fuse(dense, sparse):
     return sorted(scores.values(), key=lambda x: -x["rrf"])
 
 
+SYMPTOM_MODES = {          # question wording -> ISO 14224 failure mode
+    "VIB": ["vibration", "vibrat", "shaking"],
+    "SER": ["seal"],
+    "BRG": ["bearing"],
+    "PLU": ["strainer", "plug", "chok", "blocked", "suction pressure"],
+    "LEK": ["leak"],
+    "OHE": ["overheat", "running hot", "temperature high"],
+    "ELP": ["electrical", "overload", "contactor"],
+}
+
+
+def detect_modes(question):
+    q = question.lower()
+    return [m for m, kws in SYMPTOM_MODES.items() if any(k in q for k in kws)]
+
+
 def classify_intent(question, tags):
     """Set the blend ratio, never an exclusive branch (spec 10)."""
     if tags:
@@ -157,7 +173,7 @@ def classify_intent(question, tags):
     return "general", {"text": 0.5, "graph": 0.5}
 
 
-def build_evidence(fused, graph, blend):
+def build_evidence(fused, graph, blend, modes=()):
     """Number the evidence blocks; return (blocks, citations)."""
     blocks, citations = [], []
 
@@ -169,41 +185,59 @@ def build_evidence(fused, graph, blend):
         citations.append({"n": n, "kind": kind, "label": label, **meta})
         return n
 
-    n_text = MAX_TEXT_EVIDENCE if blend["text"] >= 0.5 else 3
-    for f in fused[:n_text]:
-        c = f["item"]
-        add("chunk", f"{c['doc']} page {c['page']}", c["text"][:MAX_CHUNK_CHARS],
-            doc=c["doc"], page=c["page"], chunk_id=c["id"], score=round(f["rrf"], 4))
+    def add_chunks():
+        n_text = MAX_TEXT_EVIDENCE if blend["text"] >= 0.5 else 3
+        for f in fused[:n_text]:
+            c = f["item"]
+            add("chunk", f"{c['doc']} page {c['page']}", c["text"][:MAX_CHUNK_CHARS],
+                doc=c["doc"], page=c["page"], chunk_id=c["id"],
+                score=round(f["rrf"], 4))
 
-    # full history + siblings only for equipment the question actually named;
-    # mention-derived equipment contributes operator knowledge only — a wall of
-    # unrelated histories drowns the answer and pollutes citations
-    for eq in sorted((e for e in graph if e and e.get("tag")),
-                     key=lambda e: not e.get("anchored")):
-        hop = 0 if eq.get("anchored") else 1
-        if eq.get("anchored"):
-            wos = sorted(eq["work_orders"], key=lambda w: w["date"], reverse=True)
-            corr = [w for w in wos if w["type"] == "corrective"][:8]
-            if corr:
-                lines = "\n".join(
-                    f"  {w['date']}  {w['code'] or '-'}  {w['hrs']}h  {w['desc'][:90]}"
-                    for w in corr)
-                add("history", f"{eq['tag']} corrective work order history "
-                    f"(class {eq['class']}, criticality {eq['criticality']})",
-                    lines, tag=eq["tag"], hop=hop,
-                    wo_ids=[w["wo_id"] for w in corr])
-            if eq["siblings"]:
-                sib_lines = "\n".join(
-                    f"  {s['tag']} (criticality {s['criticality']}) past failure modes: "
-                    f"{sorted(set(c for c in s['codes'] if c)) or 'none'}"
-                    for s in eq["siblings"])
-                add("siblings", f"Same-class equipment as {eq['tag']} ({eq['class']})",
-                    sib_lines, tag=eq["tag"], hop=2)
-        for t in eq["tacit"][:4 if eq.get("anchored") else 2]:
-            add("tacit", f"Operator knowledge ({t['lang']} audio {t['audio']} "
-                f"@ {t['t_start']:.0f}s)", t["text"],
-                audio=t["audio"], t_start=t["t_start"], lang=t["lang"],
-                claim_id=t["claim_id"], hop=hop)
+    def add_graph():
+        # full history + siblings only for equipment the question actually named;
+        # mention-derived equipment contributes operator knowledge only — a wall
+        # of unrelated histories drowns the answer and pollutes citations
+        for eq in sorted((e for e in graph if e and e.get("tag")),
+                         key=lambda e: not e.get("anchored")):
+            hop = 0 if eq.get("anchored") else 1
+            if eq.get("anchored"):
+                # rows matching the failure mode the question asked about go
+                # first — a relevant event at the bottom of a long table gets
+                # overlooked by the model (verified failure case: VIB row 7 of 7)
+                wos = sorted(eq["work_orders"], key=lambda w: w["date"], reverse=True)
+                wos = sorted(wos, key=lambda w: w["code"] not in modes)  # stable
+                corr = [w for w in wos if w["type"] == "corrective"][:8]
+                if corr:
+                    label = (f"{eq['tag']} corrective work order history "
+                             f"(class {eq['class']}, criticality {eq['criticality']})")
+                    if modes and any(w["code"] in modes for w in corr):
+                        label += f" — {'/'.join(modes)} events listed first"
+                    lines = "\n".join(
+                        f"  {w['date']}  {w['code'] or '-'}  {w['hrs']}h  {w['desc'][:90]}"
+                        for w in corr)
+                    add("history", label, lines, tag=eq["tag"], hop=hop,
+                        wo_ids=[w["wo_id"] for w in corr])
+                if eq["siblings"]:
+                    sib_lines = "\n".join(
+                        f"  {s['tag']} (criticality {s['criticality']}) past failure "
+                        f"modes: {sorted(set(c for c in s['codes'] if c)) or 'none'}"
+                        for s in eq["siblings"])
+                    add("siblings", f"Same-class equipment as {eq['tag']} "
+                        f"({eq['class']})", sib_lines, tag=eq["tag"], hop=2)
+            for t in eq["tacit"][:4 if eq.get("anchored") else 2]:
+                add("tacit", f"Operator knowledge ({t['lang']} audio {t['audio']} "
+                    f"@ {t['t_start']:.0f}s)", t["text"],
+                    audio=t["audio"], t_start=t["t_start"], lang=t["lang"],
+                    claim_id=t["claim_id"], hop=hop)
+
+    # spec 8: graph facts rank by hop distance from the anchor — for a question
+    # that names equipment, its history leads the evidence; text leads otherwise
+    if blend["graph"] >= 0.5:
+        add_graph()
+        add_chunks()
+    else:
+        add_chunks()
+        add_graph()
     return blocks, citations
 
 
@@ -213,7 +247,10 @@ def synthesis_prompt(question, blocks):
         "evidence below, which is numbered [E1], [E2], ... Every sentence of your "
         "answer MUST end with the marker(s) of the evidence that directly supports "
         "it, like [E1] or [E2][E3] — never a blanket list, and never numbers that "
-        "are not evidence markers. Be specific: dates, counts, hours. "
+        "are not evidence markers. Be specific: dates, counts, hours. Related "
+        "records ARE the answer even when wording differs — a vibration work "
+        "order answers a vibration question; report the closest documented "
+        "events rather than abstaining when directly relevant records exist. "
         f"If the evidence does not contain the answer, reply exactly: {ABSTAIN_TEXT}\n\n"
         + "\n\n".join(blocks)
         + f"\n\nQuestion: {question}\nAnswer:"
@@ -255,10 +292,11 @@ def _retrieve(question, mode="full"):
         graph = []
 
     intent, blend = classify_intent(question, tags)
+    modes = detect_modes(question)
     fused = rrf_fuse(dense, sparse)
-    blocks, citations = build_evidence(fused, graph, blend)
+    blocks, citations = build_evidence(fused, graph, blend, modes)
     return {"t0": t0, "tags": tags, "dense": dense, "sparse": sparse,
-            "graph": graph, "intent": intent, "blend": blend,
+            "graph": graph, "intent": intent, "blend": blend, "modes": modes,
             "fused": fused, "blocks": blocks, "citations": citations}
 
 
