@@ -37,7 +37,8 @@ MAX_CHUNK_CHARS = 2800          # full chunk: truncating cut SOP-114's interval 
 MAX_ANSWER_TOKENS = 350
 LLM_OPTIONS = {"temperature": 0.1, "num_predict": MAX_ANSWER_TOKENS,
                "num_ctx": 6144}  # 4096 silently clips long evidence prompts
-CONFIDENCE_THRESHOLD = 0.45
+CONFIDENCE_THRESHOLD = 0.45     # display threshold; uncited answers below it abstain
+FORCE_ABSTAIN_BELOW = 0.30      # even cited answers abstain under this
 ABSTAIN_TEXT = "Not present in the corpus."
 
 # one round trip: dense seeds + BM25 seeds + 2-hop expansion from anchors
@@ -75,6 +76,9 @@ RETURN dense, sparse,
     tacit: [(t:TacitKnowledge)-[:APPLIES_TO]->(e) |
       {claim_id: t.claim_id, text: t.text, lang: t.lang, audio: t.audio_id,
        t_start: t.t_start, type: t.claim_type}],
+    inspections: [(i:InspectionRecord)-[:ON]->(e) |
+      {record_id: i.record_id, date: toString(i.date), result: i.result,
+       valid_until: toString(i.valid_until)}],
     procedures: [(p:Procedure)-[:APPLIES_TO]->(e) | p.sop_id],
     siblings: [(:Area)-[:CONTAINS]->(s:Equipment)
                WHERE s.iso14224_class = e.iso14224_class AND s.tag <> e.tag |
@@ -99,9 +103,43 @@ def get_driver():
 def get_register(session):
     global _register
     if not _register:
-        _register = {r["key"]: r["tag"] for r in session.run(
-            "MATCH (e:Equipment) RETURN replace(e.tag,'-','') AS key, e.tag AS tag")}
+        items = session.run(
+            "MATCH (a:Area)-[:CONTAINS]->(e:Equipment) "
+            "RETURN replace(e.tag,'-','') AS key, e.tag AS tag, "
+            "e.iso14224_class AS klass, a.name AS area").data()
+        _register = {"by_key": {r["key"]: r["tag"] for r in items}, "items": items}
     return _register
+
+
+# class/area phrases resolve to equipment sets when a history-shaped question
+# names no tag ("have any heat exchangers overheated?") — without this, such
+# questions get procedure text only and wrongly abstain
+CLASS_PHRASES = [("heat exchanger", "heat_exchanger"), ("exchanger", "heat_exchanger"),
+                 ("control valve", "control_valve"), ("valve", "control_valve"),
+                 ("pump", "centrifugal_pump")]
+AREA_PHRASES = {"process area": "Area-1", "area-1": "Area-1", "area 1": "Area-1",
+                "utilities area": "Area-2", "utility area": "Area-2",
+                "area-2": "Area-2", "area 2": "Area-2"}
+HISTORY_SHAPE_RE = re.compile(
+    r"\b(fail|failure|history|happened|problem|issue|downtime|trip|broke|"
+    r"repeat|repair|corrective|inspect|expired|maintenance record)", re.I)
+
+
+def class_anchor_tags(question, register):
+    if not HISTORY_SHAPE_RE.search(question) and not detect_modes(question):
+        return []
+    q = question.lower()
+    klasses = set()
+    for phrase, klass in CLASS_PHRASES:
+        if phrase in q:
+            klasses.add(klass)
+            break                       # phrases are ordered most-specific first
+    areas = {a for p, a in AREA_PHRASES.items() if p in q}
+    if not klasses and not areas:
+        return []
+    return sorted(r["tag"] for r in register["items"]
+                  if (not klasses or r["klass"] in klasses)
+                  and (not areas or r["area"] in areas))
 
 
 def ollama(path, payload, timeout=300):
@@ -194,9 +232,12 @@ def build_evidence(fused, graph, blend, modes=()):
                 score=round(f["rrf"], 4))
 
     def add_graph():
-        # full history + siblings only for equipment the question actually named;
+        # full history + siblings only for equipment the question anchored
+        # (named tags, or class/area phrases on history-shaped questions);
         # mention-derived equipment contributes operator knowledge only — a wall
         # of unrelated histories drowns the answer and pollutes citations
+        n_anchored = sum(1 for e in graph if e and e.get("anchored"))
+        row_cap = 8 if n_anchored <= 2 else 4
         for eq in sorted((e for e in graph if e and e.get("tag")),
                          key=lambda e: not e.get("anchored")):
             hop = 0 if eq.get("anchored") else 1
@@ -206,7 +247,7 @@ def build_evidence(fused, graph, blend, modes=()):
                 # overlooked by the model (verified failure case: VIB row 7 of 7)
                 wos = sorted(eq["work_orders"], key=lambda w: w["date"], reverse=True)
                 wos = sorted(wos, key=lambda w: w["code"] not in modes)  # stable
-                corr = [w for w in wos if w["type"] == "corrective"][:8]
+                corr = [w for w in wos if w["type"] == "corrective"][:row_cap]
                 if corr:
                     label = (f"{eq['tag']} corrective work order history "
                              f"(class {eq['class']}, criticality {eq['criticality']})")
@@ -217,7 +258,17 @@ def build_evidence(fused, graph, blend, modes=()):
                         for w in corr)
                     add("history", label, lines, tag=eq["tag"], hop=hop,
                         wo_ids=[w["wo_id"] for w in corr])
-                if eq["siblings"]:
+                if eq.get("inspections"):
+                    today = time.strftime("%Y-%m-%d")
+                    insp_lines = "\n".join(
+                        f"  {i['record_id']}  {i['date']}  {i['result'][:70]}  "
+                        f"valid until {i['valid_until']}"
+                        f"{'  ** EXPIRED **' if i['valid_until'] < today else ''}"
+                        for i in eq["inspections"])
+                    add("inspection", f"{eq['tag']} inspection records", insp_lines,
+                        tag=eq["tag"], hop=hop,
+                        record_ids=[i["record_id"] for i in eq["inspections"]])
+                if eq["siblings"] and n_anchored <= 2:
                     sib_lines = "\n".join(
                         f"  {s['tag']} (criticality {s['criticality']}) past failure "
                         f"modes: {sorted(set(c for c in s['codes'] if c)) or 'none'}"
@@ -251,6 +302,7 @@ def synthesis_prompt(question, blocks):
         "records ARE the answer even when wording differs — a vibration work "
         "order answers a vibration question; report the closest documented "
         "events rather than abstaining when directly relevant records exist. "
+        "Answer the question as asked, summarising the matching records plainly. "
         f"If the evidence does not contain the answer, reply exactly: {ABSTAIN_TEXT}\n\n"
         + "\n\n".join(blocks)
         + f"\n\nQuestion: {question}\nAnswer:"
@@ -258,15 +310,23 @@ def synthesis_prompt(question, blocks):
 
 
 def confidence(answer, fused, dense, sparse):
-    top_dense = dense[0]["score"] if dense else 0.0           # cosine, already 0..1
+    # top retrieval: dense cosine is already 0..1; BM25 (ablation runs) squashed
+    if dense:
+        top = dense[0]["score"]
+    elif sparse:
+        top = min(1.0, sparse[0]["score"] / 8.0)
+    else:
+        top = 0.0
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", answer) if s.strip()]
     cited = sum(1 for s in sentences if re.search(r"\[E\d+\]", s))
     frac = cited / len(sentences) if sentences else 0.0
     d_ids = {d["id"] for d in dense[:TOP_K]}
     s_ids = {s["id"] for s in sparse[:TOP_K]}
     overlap = len(d_ids & s_ids) / max(1, min(len(d_ids), len(s_ids))) if s_ids else 0.0
-    return round(0.4 * top_dense + 0.3 * frac + 0.3 * overlap, 3), {
-        "top_dense": round(top_dense, 3), "cited_fraction": round(frac, 3),
+    # overlap is structurally noisy on a small corpus — weight it lightly, or
+    # correct cited answers get pushed under the abstain threshold
+    return round(0.5 * top + 0.4 * frac + 0.1 * overlap, 3), {
+        "top_dense": round(top, 3), "cited_fraction": round(frac, 3),
         "bm25_dense_overlap": round(overlap, 3)}
 
 
@@ -275,7 +335,10 @@ def _retrieve(question, mode="full"):
     t0 = time.time()
     with get_driver().session(database=NEO4J_DATABASE) as s:
         register = get_register(s)
-        tags = sorted({register[k] for k in find_mentions(question) if k in register})
+        by_key = register["by_key"]
+        tags = sorted({by_key[k] for k in find_mentions(question) if k in by_key})
+        if not tags:
+            tags = class_anchor_tags(question, register)
         qvec = ollama("/api/embed", {"model": EMBED_MODEL, "input": [question]}
                       )["embeddings"][0]
         rec = s.run(RETRIEVAL_QUERY, qvec=qvec, ftq=lucene_sanitise(question),
@@ -302,11 +365,17 @@ def _retrieve(question, mode="full"):
 
 def _finalise(question, answer, w):
     conf, parts = confidence(answer, w["fused"], w["dense"], w["sparse"])
-    abstained = ABSTAIN_TEXT.lower() in answer.lower() or conf < CONFIDENCE_THRESHOLD
-    if conf < CONFIDENCE_THRESHOLD and ABSTAIN_TEXT.lower() not in answer.lower():
-        answer = (f"{ABSTAIN_TEXT} (Confidence {conf} is below the "
-                  f"{CONFIDENCE_THRESHOLD} threshold; refusing to guess.)")
     used = {int(n) for n in re.findall(r"\[E(\d+)\]", answer)}
+    model_abstained = ABSTAIN_TEXT.lower() in answer.lower()
+    # a substantive, cited answer stands on its own — force abstain only when
+    # the answer carries no citations at all or confidence collapses entirely
+    forced = (not model_abstained) and (
+        conf < FORCE_ABSTAIN_BELOW or (not used and conf < CONFIDENCE_THRESHOLD))
+    if forced:
+        answer = (f"{ABSTAIN_TEXT} (Confidence {conf} is too low; "
+                  "refusing to guess.)")
+        used = set()
+    abstained = model_abstained or forced
     return {
         "answer": answer, "abstained": abstained,
         "confidence": conf, "confidence_parts": parts,
