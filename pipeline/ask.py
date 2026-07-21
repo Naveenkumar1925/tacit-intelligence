@@ -40,6 +40,10 @@ LLM_OPTIONS = {"temperature": 0.1, "num_predict": MAX_ANSWER_TOKENS,
 CONFIDENCE_THRESHOLD = 0.45     # display threshold; uncited answers below it abstain
 FORCE_ABSTAIN_BELOW = 0.30      # even cited answers abstain under this
 ABSTAIN_TEXT = "Not present in the corpus."
+# detection must ignore the trailing period: the model often appends citation
+# markers ("Not present in the corpus [E1][E2].") and a period-inclusive match
+# silently fails to recognise its own refusal
+ABSTAIN_MATCH = "not present in the corpus"
 
 # one round trip: dense seeds + BM25 seeds + 2-hop expansion from anchors
 RETRIEVAL_QUERY = """
@@ -491,7 +495,7 @@ def _retrieve(question, mode="full"):
 def _finalise(question, answer, w):
     conf, parts = confidence(answer, w["fused"], w["dense"], w["sparse"])
     used = {int(n) for n in re.findall(r"\[E(\d+)\]", answer)}
-    model_abstained = ABSTAIN_TEXT.lower() in answer.lower()
+    model_abstained = ABSTAIN_MATCH in answer.lower()
     # a substantive, cited answer stands on its own — force abstain only when
     # the answer carries no citations at all or confidence collapses entirely
     forced = (not model_abstained) and (
