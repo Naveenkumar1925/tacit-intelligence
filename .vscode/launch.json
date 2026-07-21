@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Plant Brain — web app (app.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/app.py",
+      "console": "integratedTerminal",
+      "python": "C:\\Users\\krith\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
