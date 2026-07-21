@@ -4,3 +4,7 @@ backups/*.dump
 corpus/audio/*.wav
 corpus/audio/*.m4a
 corpus/audio/*.mp3
+
+# local backups — restore artifacts, not source
+backup_v1/
+backup_v1.zip
