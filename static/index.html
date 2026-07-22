@@ -425,7 +425,7 @@ async function loadAlerts(){
     if(a.kind === 'divergence'){
       facts = `<div class="divg">
           <div class="sop"><b>${esc(d.sop||'')}</b> says<br>“${esc(d.procedure_says||'')}”</div>
-          <div class="ops"><b>${d.n_independent_claims||0} operators</b> say<br>“${esc(d.operators_say||'')}”</div>
+          <div class="ops"><b>${d.n_independent_claims||0} operator${(d.n_independent_claims===1)?'':'s'}</b> say${(d.n_independent_claims===1)?'s':''}<br>“${esc(d.operators_say||'')}”</div>
         </div>` + (d.claims||[]).map(c =>
           `<div class="claim">🗣 <span class="evlink" onclick="playAudio('${c.audio}',${c.t_start})">${esc(c.audio)} @ ${Math.round(c.t_start)}s</span>
              <span class="lang">${esc(c.lang)}</span> — ${esc(c.text)}</div>`).join('');

@@ -1,0 +1,2 @@
+lang: en
+On the P-101 pumps, the suction strainer has to be cleaned every two weeks during the monsoon - the monthly interval in the manual isn't enough, because debris builds up much faster in the rainy season.

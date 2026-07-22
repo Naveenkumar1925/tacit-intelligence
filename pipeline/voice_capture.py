@@ -28,7 +28,7 @@ from neo4j import GraphDatabase
 sys.path.insert(0, str(Path(__file__).parent))
 from config import (NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD, NEO4J_DATABASE,
                     CORPUS, OLLAMA_BASE_URL, LLM_MODEL, EMBED_MODEL, EMBED_DIM)
-from resolve import normalise_spoken, find_mentions_raw
+from resolve import normalise_spoken, find_mentions_raw, find_series
 
 AUDIO_DIR = CORPUS / "audio"
 AUDIO_EXTS = {".wav", ".mp3", ".m4a", ".ogg", ".flac"}
@@ -51,7 +51,20 @@ def embed(texts):
 
 
 def load_model():
-    from faster_whisper import WhisperModel
+    """Load Whisper, or return None if its audio backend is unavailable.
+
+    faster-whisper decodes audio through PyAV; on some locked-down Windows
+    machines an Application Control policy blocks PyAV's native DLL. When that
+    happens we fall back to a text sidecar (see transcribe_sidecar) so the rest
+    of the pipeline — tag recovery, claim structuring, embedding, divergence —
+    still runs on the operator's real words.
+    """
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as e:
+        print(f"[warn] Whisper audio backend unavailable ({e.__class__.__name__}: "
+              f"{e}); will use .txt sidecars where present.")
+        return None
     print(f"loading faster-whisper {WHISPER_MODEL} (CPU, int8)...")
     return WhisperModel(WHISPER_MODEL, device="cpu", compute_type="int8")
 
@@ -61,6 +74,25 @@ def transcribe(model, path: Path):
     segs = [{"start": round(s.start, 1), "end": round(s.end, 1), "text": s.text.strip()}
             for s in segments]
     return segs, info.language, round(info.language_probability, 3)
+
+
+def transcribe_sidecar(path: Path):
+    """Read a <stem>.txt transcript beside the audio, if present.
+
+    First line may declare 'lang: xx' (e.g. the operator's spoken language for
+    the detected-language badge); the rest is the English transcript. Returns
+    (segments, lang, prob) matching transcribe(), or None if no sidecar.
+    """
+    txt = path.with_suffix(".txt")
+    if not txt.exists():
+        return None
+    lines = txt.read_text(encoding="utf-8").strip().splitlines()
+    lang = "en"
+    if lines and lines[0].lower().startswith("lang:"):
+        lang = lines[0].split(":", 1)[1].strip() or "en"
+        lines = lines[1:]
+    text = " ".join(l.strip() for l in lines if l.strip())
+    return ([{"start": 0.0, "end": 0.0, "text": text}], lang, 1.0)
 
 
 def structure_claims(audio_id, segs, candidates):
@@ -116,9 +148,19 @@ def main():
             "MATCH (e:Equipment) RETURN replace(e.tag,'-','') AS key, e.tag AS tag")}
         for clip in clips:
             audio_id = clip.stem
-            segs, lang, lang_p = transcribe(model, clip)
+            if model is not None:
+                segs, lang, lang_p = transcribe(model, clip)
+                source = "whisper"
+            else:
+                sc = transcribe_sidecar(clip)
+                if sc is None:
+                    print(f"\n{clip.name}: no Whisper backend and no "
+                          f"{clip.stem}.txt sidecar — skipped.")
+                    continue
+                segs, lang, lang_p = sc
+                source = "sidecar transcript"
             full = " ".join(x["text"] for x in segs)
-            print(f"\n{clip.name}: detected language={lang} (p={lang_p})")
+            print(f"\n{clip.name} ({source}): language={lang} (p={lang_p})")
             print(f"  translation: {full[:180]}...")
 
             # tag recovery over normalised transcript; keep raw spoken spellings
@@ -132,12 +174,24 @@ def main():
                         candidates.append(tag)
                     if raw != tag:
                         aliases.append((tag, raw))
+            # family mentions ("the P-101 pumps") expand to every unit in the
+            # series — operators rarely name a specific unit when sharing a
+            # practice that applies to the whole set
+            for skey in dict.fromkeys(find_series(norm) + find_series(full)):
+                for key, tag in tag_keys.items():
+                    if key.startswith(skey) and tag not in candidates:
+                        candidates.append(tag)
             print(f"  tags recovered: {candidates}")
 
             claims = structure_claims(audio_id, segs, candidates)
             if not claims:
                 print("  [warn] no claims extracted")
                 continue
+            # single-topic clip fallback: a claim the LLM left unattached still
+            # belongs to the clip's equipment, so divergence can link it
+            for c in claims:
+                if not c.get("equipment") and candidates:
+                    c["equipment"] = list(candidates)
             vecs = embed([c["claim_text"] for c in claims])
             payload = [{
                 "claim_id": f"{audio_id}-k{i:02d}", "text": c["claim_text"],

@@ -38,6 +38,16 @@ MENTION_RE = re.compile(
     re.IGNORECASE,
 )
 
+# a SERIES mention names the equipment family without a unit letter — "the P-101
+# pumps", "the P-101 series". Operators talk this way constantly, so a claim that
+# says "P-101 pumps" must reach every P-101 unit, or divergence never links.
+# Requires the prefix (p/hx/cv) and 3 digits NOT followed by a unit letter.
+SERIES_RE = re.compile(
+    r"\b(?:(?:pump|heat\s+exchanger|exchanger|control\s+valve|valve)\s*[-.\s]*)?"
+    r"(p|hx|cv)\s*[-.\s]*(\d{3})(?![-.\s]*[a-c]\b)(?!\d)",
+    re.IGNORECASE,
+)
+
 
 def canonical_key(raw: str) -> str | None:
     """Normalise one raw tag mention to a compact key like 'P101A', or None."""
@@ -94,6 +104,21 @@ def find_mentions(text: str) -> list[str]:
     return [key for key, _raw in find_mentions_raw(text)]
 
 
+def find_series(text: str) -> list[str]:
+    """Return series keys (e.g. 'P101') for family mentions like 'the P-101 pumps'.
+
+    A series key has prefix + 3 digits and no unit letter; expand it against the
+    register with `key.startswith(series)` to reach the member units.
+    """
+    out = []
+    for m in SERIES_RE.finditer(text):
+        prefix, num = m.group(1), m.group(2)
+        key = f"{prefix.upper()}{num}"
+        if key not in out:
+            out.append(key)
+    return out
+
+
 def display_tag(key: str) -> str:
     """'P101A' -> 'P-101A' (the register's canonical display form)."""
     m = TAG_KEY_RE.match(key)
@@ -117,4 +142,10 @@ if __name__ == "__main__":
     assert canonical_key("SOP-114") is None
     assert canonical_key("WO-2024-0031") is None
     assert display_tag("P101A") == "P-101A"
+    # series: family mentions resolve to a series key, specific tags do not
+    assert find_series("clean the P-101 pumps every fortnight") == ["P101"], \
+        find_series("clean the P-101 pumps every fortnight")
+    assert find_series("the P-101 series and HX-201 exchangers") == ["P101", "HX201"]
+    assert find_series("P-101A tripped again") == []          # specific unit, not a series
+    assert find_mentions("the P-101 pumps") == []             # no unit letter -> no tag
     print("resolve.py: all self-tests passed")
